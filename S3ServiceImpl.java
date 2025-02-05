@@ -1,41 +1,42 @@
-package com.example.s3localstack.service.impl;
-
-import com.example.s3localstack.service.S3Service;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.core.sync.RequestBody;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
-@Service
-public class S3ServiceImpl implements S3Service {
+public class S3ServiceImpl {
 
     private final S3Client s3Client;
+    private final String bucketName = "my-local-bucket";
 
-    @Value("${aws.s3.bucket-name}")
-    private String bucketName;
-
-    public S3ServiceImpl(S3Client s3Client) {
-        this.s3Client = s3Client;
+    public S3ServiceImpl() {
+        this.s3Client = S3Client.builder()
+                .region(Region.US_EAST_1)
+                .endpointOverride(URI.create("http://localhost:4566")) // LocalStack endpoint
+                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test")))
+                .build();
     }
 
-    @Override
-    public String uploadJsonAsFile(String jsonData, String fileName) {
+    public void uploadJson(String jsonData, String fileName) {
         byte[] fileContent = jsonData.getBytes(StandardCharsets.UTF_8);
 
-        s3Client.putObject(
-                PutObjectRequest.builder()
-                        .bucket(bucketName)
-                        .key(fileName)
-                        .contentType("application/json")
-                        .build(),
-                RequestBody.fromBytes(fileContent)
-        );
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(fileName)
+                .contentType("application/json")
+                .build();
 
-        return "JSON file uploaded: " + fileName;
+        s3Client.putObject(putObjectRequest, RequestBody.fromBytes(fileContent));
+
+        System.out.println("✅ JSON uploaded successfully: " + fileName);
     }
 
-    // Other methods (uploadFile, downloadFile, createBucket) remain unchanged...
+    public static void main(String[] args) {
+        S3Service s3Service = new S3Service();
+        s3Service.uploadJson("{\"message\": \"Hello LocalStack!\"}", "test.json");
+    }
 }
